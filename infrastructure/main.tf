@@ -73,22 +73,19 @@ resource "aws_iam_role" "lambda_role" {
   name = "alexandria_lambda_role"
 
   assume_role_policy = data.aws_iam_policy_document.lambda_assume_role_policy_document.json
-}
 
-# Here we attach a permission to execute a lambda function to our role
-resource "aws_iam_role_policy_attachment" "alexandria_lambda_policy" {
-  for_each = toset([
-    aws_iam_policy.lambda_dynamodb_policy.arn,
-    "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
-  ])
-  role       = aws_iam_role.lambda_role.name
-  policy_arn = each.value
-}
+  managed_policy_arns = ["arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+  ]
 
+  inline_policy {
+    name   = "alexandria_dynamodb_policy"
+    policy = aws_iam_policy.lambda_dynamodb_policy.arn
+  }
+}
 
 # Here is the definition of our lambda function 
 resource "aws_lambda_function" "alexandria_lambda" {
-  function_name    = "Lambdaalexandria"
+  function_name    = "Lambda_alexandria"
   source_code_hash = data.archive_file.lambda_alexandria_archive.output_base64sha256
   filename         = data.archive_file.lambda_alexandria_archive.output_path
   handler          = "func"
