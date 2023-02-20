@@ -59,24 +59,21 @@ data "archive_file" "lambda_writer_archive" {
   output_path = "writer.zip"
 }
 
+data "aws_iam_policy_document" "lambda_assume_role_policy" {
+  statement {
+    actions = ["sts:AssumeRole"]
+
+    principals {
+      type        = "Service"
+      identifiers = ["lambda.amazonaws.com"]
+    }
+  }
+}
+
 resource "aws_iam_role" "lambda_role" {
   name = "alexandria_lambda_role"
 
-  assume_role_policy = jsonencode(
-    {
-      "Version" = "2012–10–17",
-      "Statement" = [
-        {
-          "Action" = "sts:AssumeRole",
-          "Principal" = {
-            "Service" = "lambda.amazonaws.com"
-          },
-          "Effect" = "Allow",
-          "Sid"    = ""
-        }
-      ]
-  })
-
+  assume_role_policy = data.aws_iam_policy_document.lambda_assume_role_policy.json
 }
 
 # Here we attach a permission to execute a lambda function to our role
@@ -85,23 +82,26 @@ resource "aws_iam_role_policy_attachment" "alexandria_lambda_execution_policy" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 }
 
+
+
 // Add lambda -> DynamoDB policies to the lambda execution role
-resource "aws_iam_role_policy" "write_db_policy" {
+resource "aws_iam_role_policy" "lambda_db_policy" {
 
   # Set depends on to make sure dtaabase create before getting the arn
   depends_on = [
     aws_dynamodb_table.library_database
   ]
-  name = "lambda_write_db_policy"
+  name = "lambda_lambda_db_policy"
   role = aws_iam_role.lambda_role.name
   policy = jsonencode(
     {
       "Version" = "2012–10–17",
       "Statement" = [
         {
-          "Sid" = "",
+          "Sid" = "SpecificTable",
           "Action" = [
-            "dynamodb=PutItem"
+            "dynamodb:PutItem",
+            "dynamodb:Scan"
           ],
           "Effect"   = "Allow",
           "Resource" = "${aws_dynamodb_table.library_database.arn}"
