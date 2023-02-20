@@ -1,17 +1,3 @@
-terraform {
-  required_providers {
-    aws = {
-      source  = "hashicorp/aws"
-      version = "~> 4.16"
-    }
-    archive = {
-      source  = "hashicorp/archive"
-      version = "~> 2.2.0"
-    }
-  }
-
-  required_version = ">= 1.2.0"
-}
 
 provider "aws" {
 
@@ -19,7 +5,6 @@ provider "aws" {
 
 
 data "aws_caller_identity" "current" {}
-
 
 
 resource "aws_dynamodb_table" "library_database" {
@@ -47,13 +32,14 @@ resource "aws_dynamodb_table" "library_database" {
 
 # Here we grab the compiled executable and use the archive_file package
 # to convert it into the .zip file we need.
-data "archive_file" "lambda_writer_archive" {
+data "archive_file" "lambda_alexandria_archive" {
   type        = "zip"
-  source_file = var.lambda_writer_bin_path
-  output_path = "writer.zip"
+  source_file = var.lambda_alexandria_bin_path
+  output_path = "alexandria.zip"
 }
 
-data "aws_iam_policy_document" "lambda_assume_role_policy" {
+
+data "aws_iam_policy_document" "lambda_assume_role_policy_document" {
   statement {
     actions = ["sts:AssumeRole"]
 
@@ -64,53 +50,44 @@ data "aws_iam_policy_document" "lambda_assume_role_policy" {
   }
 }
 
+resource "aws_iam_policy" "lambda_dynamodb_policy" {
+  name   = "dynamodb_policy"
+  policy = data.aws_iam_policy_document.lambda_dynamodb_policy_document.json
+}
+
+
+data "aws_iam_policy_document" "lambda_dynamodb_policy_document" {
+
+  statement {
+    actions = [
+      "dynamodb:PutItem",
+      "dynamodb:Scan"
+    ]
+    effect    = "Allow"
+    resources = [aws_dynamodb_table.library_database.arn]
+
+  }
+}
+
 resource "aws_iam_role" "lambda_role" {
   name = "alexandria_lambda_role"
 
-  assume_role_policy = data.aws_iam_policy_document.lambda_assume_role_policy.json
-}
+  assume_role_policy = data.aws_iam_policy_document.lambda_assume_role_policy_document.json
 
-# Here we attach a permission to execute a lambda function to our role
-resource "aws_iam_role_policy_attachment" "alexandria_lambda_execution_policy" {
-  role       = aws_iam_role.lambda_role.name
-  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
-}
-
-
-
-// Add lambda -> DynamoDB policies to the lambda execution role
-resource "aws_iam_role_policy" "lambda_db_policy" {
-
-  # Set depends on to make sure dtaabase create before getting the arn
-  depends_on = [
-    aws_dynamodb_table.library_database
+  managed_policy_arns = ["arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
   ]
-  name = "lambda_lambda_db_policy"
-  role = aws_iam_role.lambda_role.name
-  policy = jsonencode(
-    {
-      "Version" = "2012–10–17",
-      "Statement" = [
-        {
-          "Sid" = "SpecificTable",
-          "Action" = [
-            "dynamodb:PutItem",
-            "dynamodb:Scan"
-          ],
-          "Effect"   = "Allow",
-          "Resource" = "${aws_dynamodb_table.library_database.arn}"
-        }
-      ]
-    }
-  )
-}
 
+  inline_policy {
+    name   = "alexandria_dynamodb_policy"
+    policy = aws_iam_policy.lambda_dynamodb_policy.arn
+  }
+}
 
 # Here is the definition of our lambda function 
-resource "aws_lambda_function" "writer_lambda" {
-  function_name    = "LambdaWriter"
-  source_code_hash = data.archive_file.lambda_writer_archive.output_base64sha256
-  filename         = data.archive_file.lambda_writer_archive.output_path
+resource "aws_lambda_function" "alexandria_lambda" {
+  function_name    = "Lambda_alexandria"
+  source_code_hash = data.archive_file.lambda_alexandria_archive.output_base64sha256
+  filename         = data.archive_file.lambda_alexandria_archive.output_path
   handler          = "func"
   runtime          = "provided"
 
