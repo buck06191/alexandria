@@ -77,10 +77,10 @@ resource "aws_iam_role" "lambda_role" {
 
 # Here we attach a permission to execute a lambda function to our role
 resource "aws_iam_role_policy_attachment" "alexandria_lambda_policy" {
-  for_each = toset(
+  for_each = toset([
     aws_iam_policy.lambda_dynamodb_policy.arn,
     "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
-  )
+  ])
   role       = aws_iam_role.lambda_role.name
   policy_arn = each.value
 }
