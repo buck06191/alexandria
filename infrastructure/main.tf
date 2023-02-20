@@ -50,11 +50,6 @@ data "aws_iam_policy_document" "lambda_assume_role_policy_document" {
   }
 }
 
-resource "aws_iam_policy" "lambda_dynamodb_policy" {
-  name   = "dynamodb_policy"
-  policy = data.aws_iam_policy_document.lambda_dynamodb_policy_document.json
-}
-
 
 data "aws_iam_policy_document" "lambda_dynamodb_policy_document" {
 
@@ -69,17 +64,19 @@ data "aws_iam_policy_document" "lambda_dynamodb_policy_document" {
   }
 }
 
+
 resource "aws_iam_role" "lambda_role" {
   name = "alexandria_lambda_role"
 
   assume_role_policy = data.aws_iam_policy_document.lambda_assume_role_policy_document.json
 
-  managed_policy_arns = ["arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+  managed_policy_arns = [
+    "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
   ]
 
   inline_policy {
     name   = "alexandria_dynamodb_policy"
-    policy = aws_iam_policy.lambda_dynamodb_policy.arn
+    policy = data.aws_iam_policy_document.lambda_dynamodb_policy_document.json
   }
 }
 
