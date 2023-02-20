@@ -38,6 +38,10 @@ data "archive_file" "lambda_alexandria_archive" {
   output_path = "alexandria.zip"
 }
 
+output "zip_file" {
+  value = data.archive_file.lambda_alexandria_archive.output_path
+}
+
 
 data "aws_iam_policy_document" "lambda_assume_role_policy_document" {
   statement {
@@ -87,6 +91,7 @@ resource "aws_lambda_function" "alexandria_lambda" {
   filename         = data.archive_file.lambda_alexandria_archive.output_path
   handler          = "func"
   runtime          = "provided"
+  architectures    = ["arm64"]
 
   # here we enable debug logging for our Rust run-time environment. We would change
   # this to something less verbose for production.
