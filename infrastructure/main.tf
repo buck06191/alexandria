@@ -40,12 +40,6 @@ resource "aws_dynamodb_table" "library_database" {
     type = "S"
   }
 
-
-  ttl {
-    attribute_name = "TimeToExist"
-    enabled        = false
-  }
-
   tags = {
     Project = "alexandria"
   }
