@@ -1,3 +1,4 @@
+use aws_sdk_dynamodb::error::{PutItemError, PutItemErrorKind};
 use aws_sdk_dynamodb::output::PutItemOutput;
 use aws_sdk_dynamodb::Client;
 use log::{error, info};
@@ -66,6 +67,16 @@ pub async fn create_dynamodb_client() -> Client {
     Client::from_conf(dynamodb_config)
 }
 
+fn log_dynamodb_error(dynamodb_error: String) -> FailureResponse {
+    error!(
+        "failed to put item in {}, error: {:?}",
+        TABLE_NAME, dynamodb_error
+    );
+    FailureResponse {
+        body: "The lambda encountered an error and your message was not saved".to_owned(),
+    }
+}
+
 pub async fn upload_to_dynamodb(
     client: &Client,
     archive_item: &ArchiveItem,
@@ -78,22 +89,37 @@ pub async fn upload_to_dynamodb(
     })?;
 
     // Store our data in the DB
-    client
+    let result = client
         .put_item()
         .table_name(TABLE_NAME)
         .set_item(Some(item))
         .send()
-        .await
-        .map_err(|err| {
-            error!(
-                "failed to put item in {}, error: {:?}",
-                TABLE_NAME,
-                err.into_service_error().message()
-            );
-            FailureResponse {
-                body: "The lambda encountered an error and your message was not saved".to_owned(),
-            }
-        })
+        .await;
+
+    match result {
+        Ok(output_result) => {
+            info!("Successfully uploaded item. {:?}", output_result);
+            Ok(output_result)
+        }
+        Err(err) => match err.into_service_error() {
+            PutItemError { kind, .. } => match kind {
+                PutItemErrorKind::ResourceNotFoundException(value) => Err(log_dynamodb_error(
+                    format!("Resource not found - {:?}", value),
+                )),
+                PutItemErrorKind::InvalidEndpointException(value) => Err(log_dynamodb_error(
+                    format!("Invalid endpoint - {:?}", value),
+                )),
+                PutItemErrorKind::InternalServerError(value) => Err(log_dynamodb_error(format!(
+                    "Internal server error - {:?}",
+                    value
+                ))),
+                PutItemErrorKind::Unhandled(value) => {
+                    Err(log_dynamodb_error(format!("Unhandled error - {:?}", value)))
+                }
+                _ => Err(log_dynamodb_error("Unhandled  by lambda".to_owned())),
+            },
+        },
+    }
 }
 
 pub async fn get_table_contents(client: &Client) -> Result<Vec<ArchiveItem>, FailureResponse> {

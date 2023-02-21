@@ -1,0 +1,10 @@
+alias b:= build
+
+build:
+  cargo lambda build --release --arm64
+
+deploy: build
+  cp target/lambda/alexandria/bootstrap ../../infrastructure/lambda-bin/bootstrap
+
+watch:
+  cargo lambda watch
