@@ -49,6 +49,10 @@ data "archive_file" "lambda_alexandria_archive" {
   ]
 }
 
+output "files" {
+  value = fileset(path.module, "*")
+}
+
 data "aws_iam_policy_document" "lambda_assume_role_policy_document" {
   statement {
     actions = ["sts:AssumeRole"]
