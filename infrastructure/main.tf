@@ -32,16 +32,22 @@ resource "aws_dynamodb_table" "library_database" {
 
 # Here we grab the compiled executable and use the archive_file package
 # to convert it into the .zip file we need.
+# We need to use the null_resource to trigger creation during apply
+
+resource "null_resource" "dummy_trigger" {
+  triggers = {
+    timestamp = timestamp()
+  }
+}
+
 data "archive_file" "lambda_alexandria_archive" {
   type        = "zip"
-  source_file = var.lambda_alexandria_bin_path
-  output_path = "alexandria.zip"
+  source_file = "${path.module}/lambda-bin/bootstrap"
+  output_path = "${path.module}/alexandria.zip"
+  depends_on = [
+    null_resource.dummy_trigger
+  ]
 }
-
-output "zip_file" {
-  value = data.archive_file.lambda_alexandria_archive.output_path
-}
-
 
 data "aws_iam_policy_document" "lambda_assume_role_policy_document" {
   statement {
@@ -90,7 +96,7 @@ resource "aws_lambda_function" "alexandria_lambda" {
   source_code_hash = data.archive_file.lambda_alexandria_archive.output_base64sha256
   filename         = data.archive_file.lambda_alexandria_archive.output_path
   handler          = "func"
-  runtime          = "provided"
+  runtime          = "provided.al2"
   architectures    = ["arm64"]
 
   # here we enable debug logging for our Rust run-time environment. We would change
